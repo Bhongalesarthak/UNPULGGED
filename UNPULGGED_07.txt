@@ -1,0 +1,132 @@
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#include <RTClib.h>
+#include <DHT.h>
+
+// Pin Definitions
+#define MOISTURE_SENSOR_PIN 34  // Soil Moisture Sensor
+#define RELAY_PIN 25            // Relay Module (Water Pump Control)
+#define DHT_PIN 26              // DHT11 Temperature and Humidity Sensor
+#define RAIN_SENSOR_PIN 27      // Rain Sensor
+#define SOUND_SENSOR_PIN 33     // Sound Sensor
+#define GAS_SENSOR_PIN 32       // MQ-6 Gas Sensor
+
+// DHT Sensor Configuration
+#define DHTTYPE DHT11
+DHT dht(DHT_PIN, DHTTYPE);
+
+// OLED Display Configuration
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+#define OLED_RESET -1
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+
+// RTC Module Configuration
+RTC_DS3231 rtc;
+
+// Moisture Threshold
+#define MOISTURE_THRESHOLD 500
+
+void setup() {
+    // Initialize Serial Monitor
+    Serial.begin(115200);
+
+    // Sensor Pin Modes
+    pinMode(MOISTURE_SENSOR_PIN, INPUT);
+    pinMode(RELAY_PIN, OUTPUT);
+    pinMode(RAIN_SENSOR_PIN, INPUT);
+    pinMode(SOUND_SENSOR_PIN, INPUT);
+    pinMode(GAS_SENSOR_PIN, INPUT);
+
+    // Initialize Sensors
+    dht.begin();
+    rtc.begin();
+    display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+
+    // Display Setup Message
+    display.clearDisplay();
+    display.setTextSize(1);
+    display.setTextColor(SSD1306_WHITE);
+    display.setCursor(0, 0);
+    display.println("Smart City Sentinel");
+    display.display();
+
+    delay(2000); // Stabilization delay
+}
+
+void loop() {
+    // Read Soil Moisture Level
+    int moistureLevel = analogRead(MOISTURE_SENSOR_PIN);
+    Serial.print("Soil Moisture Level: ");
+    Serial.println(moistureLevel);
+
+    // Water Pump Control Logic
+    if (moistureLevel < MOISTURE_THRESHOLD) {
+        digitalWrite(RELAY_PIN, HIGH); // Water Pump ON
+        Serial.println("Water Pump Activated!");
+        displayMessage("Water Pump ON");
+    } else {
+        digitalWrite(RELAY_PIN, LOW);  // Water Pump OFF
+        Serial.println("Soil is moist. Water Pump OFF.");
+        displayMessage("Water Pump OFF");
+    }
+
+    // Read DHT11 Sensor Data
+    float temp = dht.readTemperature();
+    float humidity = dht.readHumidity();
+    Serial.print("Temp: "); Serial.print(temp);
+    Serial.print(" | Humidity: "); Serial.println(humidity);
+
+    // Read Rain Sensor Data
+    int rainLevel = digitalRead(RAIN_SENSOR_PIN);
+    if (rainLevel == LOW) {
+        Serial.println("Rain Detected!");
+        displayMessage("Rain Alert!");
+    }
+
+    // Read Sound Sensor Data
+    int soundLevel = digitalRead(SOUND_SENSOR_PIN);
+    if (soundLevel == HIGH) {
+        Serial.println("Loud Sound Detected!");
+        displayMessage("Sound Alert!");
+    }
+
+    // Read MQ-6 Gas Sensor
+    int gasLevel = analogRead(GAS_SENSOR_PIN);
+    if (gasLevel > 400) {  // Adjust threshold as needed
+        Serial.println("Gas Leak Detected!");
+        displayMessage("Gas Alert!");
+    }
+
+    // Display RTC Time
+    DateTime now = rtc.now();
+    Serial.print("Time: ");
+    Serial.print(now.hour()); Serial.print(":");
+    Serial.print(now.minute()); Serial.print(":");
+    Serial.println(now.second());
+
+    // OLED Display Update
+    display.clearDisplay();
+    display.setCursor(0, 0);
+    display.print("Temp: "); display.println(temp);
+    display.print("Humidity: "); display.println(humidity);
+    display.print("Soil Moisture: "); display.println(moistureLevel);
+    display.print("Time: ");
+    display.print(now.hour()); display.print(":");
+    display.print(now.minute()); display.print(":");
+    display.println(now.second());
+    display.display();
+
+    delay(2000); // Delay for stability
+}
+
+// Display Message on OLED
+void displayMessage(String message) {
+    display.clearDisplay();
+    display.setCursor(0, 20);
+    display.setTextSize(2);
+    display.println(message);
+    display.display();
+    delay(2000);
+}
